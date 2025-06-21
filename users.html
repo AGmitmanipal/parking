@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nearby Parking Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    #map {
+      height: 300px;
+      margin: 20px 0;
+    }
+    .slot {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    button {
+      padding: 6px 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 Nearby Parking Slots</h1>
+  <div id="map"></div>
+  <div id="parkingList">Loading nearby slots...</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMZKg0MPlObjb6-NY9PaBFU70JNJqktA4",
+      authDomain: "parking-bc30e.firebaseapp.com",
+      projectId: "parking-bc30e",
+      storageBucket: "parking-bc30e.appspot.com",
+      messagingSenderId: "967258176610",
+      appId: "1:967258176610:web:4604371f7a5fac6b28653b",
+      measurementId: "G-X4EHNHRF25"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+      const toRad = angle => angle * (Math.PI / 180);
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+
+      const map = L.map('map').setView([userLat, userLng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const userMarker = L.marker([userLat, userLng]).addTo(map).bindPopup("You are here").openPopup();
+
+      const parkingRef = collection(db, "parking_lots");
+      const querySnapshot = await getDocs(parkingRef);
+
+      const slots = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const latitudes = [
+          data.corners.corner1?.lat,
+          data.corners.corner2?.lat,
+          data.corners.corner3?.lat,
+          data.corners.corner4?.lat
+        ].filter(v => typeof v === 'number');
+
+        const longitudes = [
+          data.corners.corner1?.lng,
+          data.corners.corner2?.lng,
+          data.corners.corner3?.lng,
+          data.corners.corner4?.lng
+        ].filter(v => typeof v === 'number');
+
+        if (latitudes.length && longitudes.length) {
+          const avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
+          const avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
+          const distance = calculateDistance(userLat, userLng, avgLat, avgLng);
+
+          if (distance <= 2) {
+            slots.push({
+              name: data.name,
+              total: data.total,
+              available: data.available,
+              lat: avgLat,
+              lng: avgLng,
+              distance: distance
+            });
+          }
+        }
+      });
+
+      slots.sort((a, b) => a.distance - b.distance);
+
+      const container = document.getElementById("parkingList");
+      container.innerHTML = "";
+
+      if (slots.length === 0) {
+        container.innerHTML = "❌ No nearby parking found within 2 km.";
+      } else {
+        slots.forEach(slot => {
+          const div = document.createElement("div");
+          div.className = "slot";
+          div.innerHTML = `<strong>${slot.name}</strong><br>
+            Total Slots: ${slot.total}<br>
+            Available: ${slot.available}<br>
+            Distance: ${slot.distance.toFixed(2)} km<br>`;
+
+          const button = document.createElement("button");
+          button.textContent = "Show Direction";
+          button.onclick = () => {
+            const routingControl = L.Routing.control({
+              waypoints: [
+                L.latLng(userLat, userLng),
+                L.latLng(slot.lat, slot.lng)
+              ],
+              routeWhileDragging: false
+            }).addTo(map);
+          };
+
+          div.appendChild(button);
+          container.appendChild(div);
+
+          L.marker([slot.lat, slot.lng])
+            .addTo(map)
+            .bindPopup(`${slot.name}<br>Available: ${slot.available}`);
+        });
+      }
+    }, () => {
+      document.getElementById("parkingList").innerText = "Unable to access your location.";
+    });
+  </script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+</body>
+</html>
+  
