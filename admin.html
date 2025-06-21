@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Parking Dashboard</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 40px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+    }
+    input, label, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 10px;
+      border-left: 4px solid #28a745;
+    }
+    .submitted-list {
+      margin-top: 30px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.05);
+    }
+    .submitted-list h3 {
+      margin-bottom: 10px;
+    }
+    .slot {
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
+    }
+    .slot-actions {
+      margin-top: 5px;
+    }
+    .slot-actions button {
+      width: auto;
+      margin-right: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Admin Parking Panel</h2>
+    <form id="adminForm">
+      <label for="email">Admin Email:</label>
+      <input type="email" id="email" required onblur="loadPreviousSlots(this.value)" />
+
+      <label for="name">Parking Location Name:</label>
+      <input type="text" id="name" required />
+
+      <p><strong>Define All 4 Corners of the Parking Lot:</strong></p>
+
+      <label for="corner1Lat">Corner 1 Latitude:</label>
+      <input type="number" step="any" id="corner1Lat" required />
+
+      <label for="corner1Lng">Corner 1 Longitude:</label>
+      <input type="number" step="any" id="corner1Lng" required />
+
+      <label for="corner2Lat">Corner 2 Latitude:</label>
+      <input type="number" step="any" id="corner2Lat" required />
+
+      <label for="corner2Lng">Corner 2 Longitude:</label>
+      <input type="number" step="any" id="corner2Lng" required />
+
+      <label for="corner3Lat">Corner 3 Latitude:</label>
+      <input type="number" step="any" id="corner3Lat" required />
+
+      <label for="corner3Lng">Corner 3 Longitude:</label>
+      <input type="number" step="any" id="corner3Lng" required />
+
+      <label for="corner4Lat">Corner 4 Latitude:</label>
+      <input type="number" step="any" id="corner4Lat" required />
+
+      <label for="corner4Lng">Corner 4 Longitude:</label>
+      <input type="number" step="any" id="corner4Lng" required />
+
+      <label for="total">Total Parking Slots:</label>
+      <input type="number" id="total" required />
+
+      <label for="available">Currently Available Slots:</label>
+      <input type="number" id="available" required />
+
+      <button type="submit">Submit / Update / Show</button>
+    </form>
+    <div id="status" class="success" style="display: none;">✅ Updated successfully!</div>
+
+    <div class="submitted-list" id="submittedList" style="display:none">
+      <h3>Your Submitted Parking Slots:</h3>
+      <div id="slots"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMZKg0MPlObjb6-NY9PaBFU70JNJqktA4",
+      authDomain: "parking-bc30e.firebaseapp.com",
+      projectId: "parking-bc30e",
+      storageBucket: "parking-bc30e.appspot.com",
+      messagingSenderId: "967258176610",
+      appId: "1:967258176610:web:4604371f7a5fac6b28653b",
+      measurementId: "G-X4EHNHRF25"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const form = document.getElementById("adminForm");
+    const statusDiv = document.getElementById("status");
+    const slotsDiv = document.getElementById("slots");
+    const submittedListDiv = document.getElementById("submittedList");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const name = document.getElementById("name").value;
+
+      const corner1Lat = parseFloat(document.getElementById("corner1Lat").value);
+      const corner1Lng = parseFloat(document.getElementById("corner1Lng").value);
+      const corner2Lat = parseFloat(document.getElementById("corner2Lat").value);
+      const corner2Lng = parseFloat(document.getElementById("corner2Lng").value);
+      const corner3Lat = parseFloat(document.getElementById("corner3Lat").value);
+      const corner3Lng = parseFloat(document.getElementById("corner3Lng").value);
+      const corner4Lat = parseFloat(document.getElementById("corner4Lat").value);
+      const corner4Lng = parseFloat(document.getElementById("corner4Lng").value);
+
+      const total = parseInt(document.getElementById("total").value);
+      const available = parseInt(document.getElementById("available").value);
+
+      await addDoc(collection(db, "parking_lots"), {
+        owner_id: email,
+        name,
+        corners: {
+          corner1: { lat: corner1Lat, lng: corner1Lng },
+          corner2: { lat: corner2Lat, lng: corner2Lng },
+          corner3: { lat: corner3Lat, lng: corner3Lng },
+          corner4: { lat: corner4Lat, lng: corner4Lng }
+        },
+        total,
+        available,
+        last_updated: serverTimestamp()
+      });
+
+      statusDiv.style.display = "block";
+      form.reset();
+      loadPreviousSlots(email);
+    });
+
+    window.loadPreviousSlots = async function(email) {
+      if (!email) return;
+      const q = query(collection(db, "parking_lots"), where("owner_id", "==", email));
+      const snapshot = await getDocs(q);
+      slotsDiv.innerHTML = "";
+      submittedListDiv.style.display = "block";
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const div = document.createElement("div");
+        div.classList.add("slot");
+        div.innerHTML = `<strong>${data.name}</strong><br>Total Slots: ${data.total}, Available: <input type='number' id='edit-${docSnap.id}' value='${data.available}' style='width:60px'/>`;
+
+        const actions = document.createElement("div");
+        actions.classList.add("slot-actions");
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = async () => {
+          await deleteDoc(doc(db, "parking_lots", docSnap.id));
+          loadPreviousSlots(email);
+        };
+
+        const updateBtn = document.createElement("button");
+        updateBtn.textContent = "Update Availability";
+        updateBtn.onclick = async () => {
+          const newAvailable = parseInt(document.getElementById(`edit-${docSnap.id}`).value);
+          await updateDoc(doc(db, "parking_lots", docSnap.id), { available: newAvailable, last_updated: serverTimestamp() });
+          loadPreviousSlots(email);
+        };
+
+        actions.appendChild(deleteBtn);
+        actions.appendChild(updateBtn);
+        div.appendChild(actions);
+        slotsDiv.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>
+
