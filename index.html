@@ -47,6 +47,8 @@
   <div id="parkingList">Loading nearby slots...</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -76,6 +78,20 @@
       return R * c;
     }
 
+    function isPointInPolygon(point, vs) {
+      const x = point[0], y = point[1];
+      let inside = false;
+      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        const xi = vs[i][0], yi = vs[i][1];
+        const xj = vs[j][0], yj = vs[j][1];
+
+        const intersect = ((yi > y) !== (yj > y)) &&
+                          (x < (xj - xi) * (y - yi) / (yj - yi + 0.0000001) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
     navigator.geolocation.getCurrentPosition(async (position) => {
       const userLat = position.coords.latitude;
       const userLng = position.coords.longitude;
@@ -94,19 +110,15 @@
 
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        const latitudes = [
-          data.corners.corner1?.lat,
-          data.corners.corner2?.lat,
-          data.corners.corner3?.lat,
-          data.corners.corner4?.lat
-        ].filter(v => typeof v === 'number');
+        const corners = [
+          data.corners.corner1,
+          data.corners.corner2,
+          data.corners.corner3,
+          data.corners.corner4
+        ];
 
-        const longitudes = [
-          data.corners.corner1?.lng,
-          data.corners.corner2?.lng,
-          data.corners.corner3?.lng,
-          data.corners.corner4?.lng
-        ].filter(v => typeof v === 'number');
+        const latitudes = corners.map(c => c?.lat).filter(v => typeof v === 'number');
+        const longitudes = corners.map(c => c?.lng).filter(v => typeof v === 'number');
 
         if (latitudes.length && longitudes.length) {
           const avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
@@ -119,10 +131,14 @@
               name: data.name,
               total: data.total,
               available: data.available,
+              reservations: data.reservations || [],
               lat: avgLat,
               lng: avgLng,
-              distance: distance
+              distance,
+              corners: corners.map(c => [c.lat, c.lng])
             });
+
+            L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
           }
         }
       });
@@ -136,20 +152,24 @@
         container.innerHTML = "❌ No nearby parking found within 2 km.";
       } else {
         slots.forEach(slot => {
+          const reservedCount = slot.reservations.length;
           const div = document.createElement("div");
           div.className = "slot";
           div.innerHTML = `<strong>${slot.name}</strong><br>
             Total Slots: ${slot.total}<br>
             Available: ${slot.available}<br>
+            Reserved: ${reservedCount}<br>
             Distance: ${slot.distance.toFixed(2)} km<br>`;
 
           const startTimeInput = document.createElement("input");
           startTimeInput.type = "time";
-          startTimeInput.placeholder = "Start Time";
+          const startPeriod = document.createElement("select");
+          startPeriod.innerHTML = `<option value="AM">AM</option><option value="PM">PM</option>`;
 
           const endTimeInput = document.createElement("input");
           endTimeInput.type = "time";
-          endTimeInput.placeholder = "End Time";
+          const endPeriod = document.createElement("select");
+          endPeriod.innerHTML = `<option value="AM">AM</option><option value="PM">PM</option>`;
 
           const daysInput = document.createElement("input");
           daysInput.type = "number";
@@ -158,7 +178,7 @@
           const reserveBtn = document.createElement("button");
           reserveBtn.textContent = "Reserve Slot";
           reserveBtn.onclick = async () => {
-            if (!startTimeInput.value || !endTimeInput.value || !daysInput.value) {
+            if (!startTimeInput.value || !startPeriod.value || !endTimeInput.value || !endPeriod.value || !daysInput.value) {
               alert("Please fill in all reservation details.");
               return;
             }
@@ -166,8 +186,8 @@
               await updateDoc(doc(db, "parking_lots", slot.id), {
                 available: slot.available - 1,
                 reservations: arrayUnion({
-                  startTime: startTimeInput.value,
-                  endTime: endTimeInput.value,
+                  startTime: `${startTimeInput.value} ${startPeriod.value}`,
+                  endTime: `${endTimeInput.value} ${endPeriod.value}`,
                   days: parseInt(daysInput.value),
                   bookedAt: new Date().toISOString()
                 })
@@ -192,7 +212,9 @@
           };
 
           div.appendChild(startTimeInput);
+          div.appendChild(startPeriod);
           div.appendChild(endTimeInput);
+          div.appendChild(endPeriod);
           div.appendChild(daysInput);
           div.appendChild(reserveBtn);
           div.appendChild(directionBtn);
@@ -202,13 +224,31 @@
             .addTo(map)
             .bindPopup(`${slot.name}<br>Available: ${slot.available}`);
         });
+
+        let popupShown = false;
+        navigator.geolocation.watchPosition((pos) => {
+          const currentLat = pos.coords.latitude;
+          const currentLng = pos.coords.longitude;
+          userMarker.setLatLng([currentLat, currentLng]);
+
+          slots.forEach(slot => {
+            if (isPointInPolygon([currentLat, currentLng], slot.corners)) {
+              if (!popupShown) {
+                popupShown = true;
+                const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
+                if (response && response.toLowerCase() === "yes") {
+                  alert("Thank you for confirming. Your presence has been noted.");
+                }
+              }
+            }
+          });
+        }, (err) => {
+          console.error("Error tracking position:", err);
+        });
       }
     }, () => {
       document.getElementById("parkingList").innerText = "Unable to access your location.";
     });
   </script>
-  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
 </body>
 </html>
-
