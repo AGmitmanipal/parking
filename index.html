@@ -158,6 +158,10 @@
           const reserveBtn = document.createElement("button");
           reserveBtn.textContent = "Reserve Slot";
           reserveBtn.onclick = async () => {
+            if (!startTimeInput.value || !endTimeInput.value || !daysInput.value) {
+              alert("Please fill in all reservation details.");
+              return;
+            }
             if (slot.available > 0) {
               await updateDoc(doc(db, "parking_lots", slot.id), {
                 available: slot.available - 1,
