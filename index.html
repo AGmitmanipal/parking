@@ -34,6 +34,11 @@
       cursor: pointer;
       margin-top: 5px;
     }
+    input, select {
+      margin-top: 5px;
+      padding: 5px;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -44,7 +49,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyDMZKg0MPlObjb6-NY9PaBFU70JNJqktA4",
@@ -87,8 +92,8 @@
 
       const slots = [];
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
         const latitudes = [
           data.corners.corner1?.lat,
           data.corners.corner2?.lat,
@@ -110,6 +115,7 @@
 
           if (distance <= 2) {
             slots.push({
+              id: docSnap.id,
               name: data.name,
               total: data.total,
               available: data.available,
@@ -137,9 +143,41 @@
             Available: ${slot.available}<br>
             Distance: ${slot.distance.toFixed(2)} km<br>`;
 
-          const button = document.createElement("button");
-          button.textContent = "Show Direction";
-          button.onclick = () => {
+          const startTimeInput = document.createElement("input");
+          startTimeInput.type = "time";
+          startTimeInput.placeholder = "Start Time";
+
+          const endTimeInput = document.createElement("input");
+          endTimeInput.type = "time";
+          endTimeInput.placeholder = "End Time";
+
+          const daysInput = document.createElement("input");
+          daysInput.type = "number";
+          daysInput.placeholder = "For how many days?";
+
+          const reserveBtn = document.createElement("button");
+          reserveBtn.textContent = "Reserve Slot";
+          reserveBtn.onclick = async () => {
+            if (slot.available > 0) {
+              await updateDoc(doc(db, "parking_lots", slot.id), {
+                available: slot.available - 1,
+                reservations: arrayUnion({
+                  startTime: startTimeInput.value,
+                  endTime: endTimeInput.value,
+                  days: parseInt(daysInput.value),
+                  bookedAt: new Date().toISOString()
+                })
+              });
+              alert("Reservation confirmed!");
+              location.reload();
+            } else {
+              alert("No slots available!");
+            }
+          };
+
+          const directionBtn = document.createElement("button");
+          directionBtn.textContent = "Show Direction";
+          directionBtn.onclick = () => {
             const routingControl = L.Routing.control({
               waypoints: [
                 L.latLng(userLat, userLng),
@@ -149,7 +187,11 @@
             }).addTo(map);
           };
 
-          div.appendChild(button);
+          div.appendChild(startTimeInput);
+          div.appendChild(endTimeInput);
+          div.appendChild(daysInput);
+          div.appendChild(reserveBtn);
+          div.appendChild(directionBtn);
           container.appendChild(div);
 
           L.marker([slot.lat, slot.lng])
@@ -165,4 +207,4 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
 </body>
 </html>
-  
+
