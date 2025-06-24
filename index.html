@@ -226,22 +226,44 @@
         });
 
         let popupShown = false;
+        let redMarker = null;
+        let isParked = false;
+
         navigator.geolocation.watchPosition((pos) => {
           const currentLat = pos.coords.latitude;
           const currentLng = pos.coords.longitude;
           userMarker.setLatLng([currentLat, currentLng]);
 
+          let insideAnyPolygon = false;
+
           slots.forEach(slot => {
-            if (isPointInPolygon([currentLat, currentLng], slot.corners)) {
-              if (!popupShown) {
+            const inside = isPointInPolygon([currentLat, currentLng], slot.corners);
+            if (inside) {
+              insideAnyPolygon = true;
+              if (!popupShown && !isParked) {
                 popupShown = true;
                 const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
                 if (response && response.toLowerCase() === "yes") {
-                  alert("Thank you for confirming. Your presence has been noted.");
+                  isParked = true;
+                  redMarker = L.circleMarker([currentLat, currentLng], {
+                    color: 'red',
+                    radius: 8,
+                    fillColor: 'red',
+                    fillOpacity: 0.9
+                  }).addTo(map).bindPopup("Your parked location").openPopup();
                 }
               }
             }
           });
+
+          if (!insideAnyPolygon && isParked) {
+            isParked = false;
+            popupShown = false;
+            if (redMarker) {
+              map.removeLayer(redMarker);
+              redMarker = null;
+            }
+          }
         }, (err) => {
           console.error("Error tracking position:", err);
         });
