@@ -126,21 +126,19 @@
           const avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
           const distance = calculateDistance(userLat, userLng, avgLat, avgLng);
 
-          if (distance <= 2) {
-            slots.push({
-              id: docSnap.id,
-              name: data.name,
-              total: data.total,
-              available: data.available,
-              reservations: data.reservations || [],
-              lat: avgLat,
-              lng: avgLng,
-              distance,
-              corners: corners.map(c => [c.lat, c.lng])
-            });
+          slots.push({
+            id: docSnap.id,
+            name: data.name,
+            total: data.total,
+            available: data.available,
+            reservations: data.reservations || [],
+            lat: avgLat,
+            lng: avgLng,
+            distance,
+            corners: corners.map(c => [c.lat, c.lng])
+          });
 
-            L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
-          }
+          L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
         }
       });
 
@@ -150,7 +148,7 @@
       container.innerHTML = "";
 
       if (slots.length === 0) {
-        container.innerHTML = "❌ No nearby parking found within 2 km.";
+        container.innerHTML = "❌ No parking slots found.";
       } else {
         slots.forEach(slot => {
           const reservedCount = slot.reservations.length;
@@ -183,13 +181,12 @@
               alert("Please fill in all reservation details.");
               return;
             }
-            
 
             if (slot.available > 0) {
               await updateDoc(doc(db, "parking_lots", slot.id), {
                 available: slot.available - 1,
                 reservations: arrayUnion({
-                                    startTime: `${startTimeInput.value} ${startPeriod.value}`,
+                  startTime: `${startTimeInput.value} ${startPeriod.value}`,
                   endTime: `${endTimeInput.value} ${endPeriod.value}`,
                   days: parseInt(daysInput.value),
                   bookedAt: new Date().toISOString()
@@ -233,53 +230,49 @@
         let isParked = false;
 
         navigator.geolocation.watchPosition((pos) => {
-  const currentLat = pos.coords.latitude;
-  const currentLng = pos.coords.longitude;
-  userMarker.setLatLng([currentLat, currentLng]);
+          const currentLat = pos.coords.latitude;
+          const currentLng = pos.coords.longitude;
+          userMarker.setLatLng([currentLat, currentLng]);
 
-  console.log("Tracking location:", currentLat, currentLng, "Accuracy:", pos.coords.accuracy);
+          console.log("Tracking location:", currentLat, currentLng, "Accuracy:", pos.coords.accuracy);
 
-  let insideAnyPolygon = false;
+          let insideAnyPolygon = false;
 
-  slots.forEach(slot => {
-    const inside = isPointInPolygon([currentLat, currentLng], slot.corners);
-    if (inside) {
-      insideAnyPolygon = true;
-      if (!popupShown && !isParked) {
-        popupShown = true;
-        const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
-        if (response && response.toLowerCase() === "yes") {
-          isParked = true;
-          redMarker = L.circleMarker([currentLat, currentLng], {
-            color: 'red',
-            radius: 8,
-            fillColor: 'red',
-            fillOpacity: 0.9
-          }).addTo(map).bindPopup("Your parked location").openPopup();
-        }
-      }
-    }
-  });
+          slots.forEach(slot => {
+            const inside = isPointInPolygon([currentLat, currentLng], slot.corners);
+            if (inside) {
+              insideAnyPolygon = true;
+              if (!popupShown && !isParked) {
+                popupShown = true;
+                const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
+                if (response && response.toLowerCase() === "yes") {
+                  isParked = true;
+                  redMarker = L.circleMarker([currentLat, currentLng], {
+                    color: 'red',
+                    radius: 8,
+                    fillColor: 'red',
+                    fillOpacity: 0.9
+                  }).addTo(map).bindPopup("Your parked location").openPopup();
+                }
+              }
+            }
+          });
 
-  if (!insideAnyPolygon && isParked) {
-    isParked = false;
-    popupShown = false;
-    if (redMarker) {
-      map.removeLayer(redMarker);
-      redMarker = null;
-    }
-  }
-}, (err) => {
-  console.error("Error tracking position:", err);
-}, {
-  enableHighAccuracy: true,
-  timeout: 10000,
-  maximumAge: 0
-});
-
-
-        
-        
+          if (!insideAnyPolygon && isParked) {
+            isParked = false;
+            popupShown = false;
+            if (redMarker) {
+              map.removeLayer(redMarker);
+              redMarker = null;
+            }
+          }
+        }, (err) => {
+          console.error("Error tracking position:", err);
+        }, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
       }
     }, () => {
       document.getElementById("parkingList").innerText = "Unable to access your location.";
@@ -287,4 +280,3 @@
   </script>
 </body>
 </html>
-
