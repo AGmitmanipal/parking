@@ -42,40 +42,16 @@
   </style>
 </head>
 <body>
-  <div style="text-align:center; margin-bottom: 20px;">
-    <button id="loginBtn">Sign in with Google</button>
-    <button id="logoutBtn" style="display:none;">Logout</button>
-    <p id="userInfo"></p>
-  </div>
+  
   <h1>🚗 Nearby Parking Slots</h1>
   <div id="map"></div>
   <div id="parkingList">Loading nearby slots...</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const userInfo = document.getElementById("userInfo");
-
-    loginBtn.onclick = () => signInWithPopup(auth, provider).catch(console.error);
-    logoutBtn.onclick = () => signOut(auth).catch(console.error);
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'inline-block';
-        userInfo.textContent = `Signed in as ${user.displayName}`;
-      } else {
-        loginBtn.style.display = 'inline-block';
-        logoutBtn.style.display = 'none';
-        userInfo.textContent = 'You are not signed in';
-      }
-    });
-
-</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
   <script type="module">
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
@@ -90,8 +66,6 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
 
     function calculateDistance(lat1, lng1, lat2, lng2) {
       const toRad = angle => angle * (Math.PI / 180);
@@ -209,20 +183,13 @@ const provider = new GoogleAuthProvider();
               alert("Please fill in all reservation details.");
               return;
             }
-            const user = auth.currentUser;
-            if (!user) {
-              alert("Please sign in to make a reservation.");
-              return;
-            }
+            
 
             if (slot.available > 0) {
               await updateDoc(doc(db, "parking_lots", slot.id), {
                 available: slot.available - 1,
                 reservations: arrayUnion({
-                  uid: user.uid,
-                  name: user.displayName,
-                  email: user.email,
-                  startTime: `${startTimeInput.value} ${startPeriod.value}`,
+                                    startTime: `${startTimeInput.value} ${startPeriod.value}`,
                   endTime: `${endTimeInput.value} ${endPeriod.value}`,
                   days: parseInt(daysInput.value),
                   bookedAt: new Date().toISOString()
