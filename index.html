@@ -80,18 +80,19 @@
     }
 
     function isPointInPolygon(point, vs) {
-      const x = point[0], y = point[1];
-      let inside = false;
-      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-        const xi = vs[i][0], yi = vs[i][1];
-        const xj = vs[j][0], yj = vs[j][1];
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
 
-        const intersect = ((yi > y) !== (yj > y)) &&
-                          (x < (xj - xi) * (y - yi) / (yj - yi + 0.0000001) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    }
+    const intersect = ((yi > y) !== (yj > y)) &&
+                      (x < (xj - xi) * (y - yi) / (yj - yi + 0.0000001) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       const userLat = position.coords.latitude;
@@ -242,19 +243,46 @@
             const inside = isPointInPolygon([currentLat, currentLng], slot.corners);
             if (inside) {
               insideAnyPolygon = true;
-              if (!popupShown && !isParked) {
-                popupShown = true;
-                const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
-                if (response && response.toLowerCase() === "yes") {
-                  isParked = true;
-                  redMarker = L.circleMarker([currentLat, currentLng], {
-                    color: 'red',
-                    radius: 8,
-                    fillColor: 'red',
-                    fillOpacity: 0.9
-                  }).addTo(map).bindPopup("Your parked location").openPopup();
-                }
-              }
+              let insideAnyPolygon = false;
+
+querySnapshot.forEach((docSnap) => {
+  const data = docSnap.data();
+  const corners = [
+    data.corners.corner1,
+    data.corners.corner2,
+    data.corners.corner3,
+    data.corners.corner4
+  ];
+
+  const polygonCoords = corners.map(c => [c.lat, c.lng]);
+  if (isPointInPolygon([userLat, userLng], polygonCoords)) {
+    insideAnyPolygon = true;
+  }
+});
+
+if (insideAnyPolygon && !popupShown && !isParked) {
+  popupShown = true;
+  const confirmPark = prompt("Are you going to park here? (Type 'yes' after reaching)");
+  if (confirmPark && confirmPark.toLowerCase() === "yes") {
+    isParked = true;
+    redMarker = L.circleMarker([userLat, userLng], {
+      color: 'red',
+      radius: 8,
+      fillColor: 'red',
+      fillOpacity: 0.9
+    }).addTo(map).bindPopup("Your parked location").openPopup();
+  }
+}
+
+if (!insideAnyPolygon && isParked) {
+  isParked = false;
+  popupShown = false;
+  if (redMarker) {
+    map.removeLayer(redMarker);
+    redMarker = null;
+  }
+}
+
             }
           });
 
