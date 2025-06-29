@@ -42,13 +42,69 @@
   </style>
 </head>
 <body>
+
+  
+  <div class="auth-container">
+    
+    <!-- Toggle Buttons -->
+    <div class="toggle-buttons">
+      <button onclick="showSignUp()">Sign Up</button>
+      <button onclick="showLogIn()">Log In</button>
+    </div>
+
+    <!-- Sign Up Form -->
+    <div id="signup-form" class="auth-form">
+      <h2>Sign Up</h2>
+      <input id="signup-username" placeholder="Username" />
+      <input id="signup-email" type="email" placeholder="Email" />
+      <input id="signup-password" type="password" placeholder="Password" />
+      <input id="signup-confirm" type="password" placeholder="Confirm Password" />
+      <button onclick="signUp()">Sign Up</button>
+    </div>
+
+    <!-- Log In Form -->
+    <div id="login-form" class="auth-form" style="display: none;">
+      <h2>Log In</h2>
+      <input id="login-email" type="email" placeholder="Email" />
+      <input id="login-password" type="password" placeholder="Password" />
+      <button onclick="logIn()">Log In</button>
+      <button class="google-btn" onclick="googleLogin()">Continue with Google</button>
+    </div>
+
+  </div>
+
+  <!-- View Switcher Script -->
+  <script>
+    function showSignUp() {
+      document.getElementById("signup-form").style.display = "flex";
+      document.getElementById("login-form").style.display = "none";
+    }
+
+    function showLogIn() {
+      document.getElementById("signup-form").style.display = "none";
+      document.getElementById("login-form").style.display = "flex";
+    }
+  </script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Your Firebase logic -->
+  <script src="app.js"></script>
+
+
+
+
+
+
   <button onclick="logout()">Logout</button>
 
   
   <h1>🚗 Nearby Parking Slots</h1>
   <div id="map"></div>
   <div id="parkingList">Loading nearby slots...</div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -71,6 +127,28 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
+    let currentUser = null;
+
+    window.logout = function() {
+    signOut(auth).then(() => {
+      alert("Logged out");
+      window.location.href = "";
+    }).catch((error) => {
+      alert("Error logging out: " + error.message);
+    });
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+    currentUser = user;
+    console.log("✅ Logged in as:", user.email);
+    }
+
+    
+  });
+
+  
+
 
     function calculateDistance(lat1, lng1, lat2, lng2) {
       const toRad = angle => angle * (Math.PI / 180);
@@ -101,20 +179,6 @@
     navigator.geolocation.getCurrentPosition(async (position) => {
       const userLat = position.coords.latitude;
       const userLng = position.coords.longitude;
-
-      let currentUser = null;
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    currentUser = user;
-    console.log("✅ Logged in as", user.email);
-  } else {
-    alert("You must be signed in to reserve parking.");
-    window.location.href = "login.html"; // or show a login modal
-  }
-});
-
-
       const map = L.map('map').setView([userLat, userLng], 15);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
@@ -126,62 +190,61 @@ onAuthStateChanged(auth, (user) => {
       const querySnapshot = await getDocs(parkingRef);
 
       const slots = [];
+      querySnapshot.forEach(async (docSnap) => {
+  const data = docSnap.data();
 
-      if (data.available !== availableCount) {
-          await updateDoc(doc(db, "parking_lots", docSnap.id), {
-            available: availableCount,
-            reservations: activeReservations
-          });
-        }
+  // Step 1: Get current time
+  const now = new Date();
 
-      querySnapshot.forEach((docSnap) => {
+  // Step 2: Filter active reservations (whose endTimestamp is still in future)
+  const activeReservations = (data.reservations || []).filter(r => {
+    return new Date(r.endTimestamp) > now;
+  });
 
-        
-        const data = docSnap.data();
+  // Step 3: Compute available slots
+  const reservedCount = activeReservations.length;
+  const availableCount = data.total - reservedCount;
 
-        // Step 1: Get current time
-const now = new Date();
+  // ✅ Now use it
+  if (data.available !== availableCount) {
+    await updateDoc(doc(db, "parking_lots", docSnap.id), {
+      available: availableCount,
+      reservations: activeReservations
+    });
+  }
 
-// Step 2: Filter active reservations (whose endTimestamp is still in future)
-const activeReservations = (data.reservations || []).filter(r => {
-  return new Date(r.endTimestamp) > now;
+  // Step 4: Process corners
+  const corners = [
+    data.corners.corner1,
+    data.corners.corner2,
+    data.corners.corner3,
+    data.corners.corner4
+  ];
+
+  const latitudes = corners.map(c => c?.lat).filter(v => typeof v === 'number');
+  const longitudes = corners.map(c => c?.lng).filter(v => typeof v === 'number');
+
+  if (latitudes.length && longitudes.length) {
+    const avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
+    const avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
+    const distance = calculateDistance(userLat, userLng, avgLat, avgLng);
+
+    slots.push({
+      id: docSnap.id,
+      name: data.name,
+      total: data.total,
+      available: availableCount,
+      reservations: activeReservations || [],
+      lat: avgLat,
+      lng: avgLng,
+      distance,
+      corners: corners.map(c => [c.lat, c.lng])
+    });
+
+    L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
+  }
 });
 
-// Step 3: Compute available slots
-const reservedCount = activeReservations.length;
-const availableCount = data.total - reservedCount;
-
-     
-        const corners = [
-          data.corners.corner1,
-          data.corners.corner2,
-          data.corners.corner3,
-          data.corners.corner4
-        ];
-
-        const latitudes = corners.map(c => c?.lat).filter(v => typeof v === 'number');
-        const longitudes = corners.map(c => c?.lng).filter(v => typeof v === 'number');
-
-        if (latitudes.length && longitudes.length) {
-          const avgLat = latitudes.reduce((a, b) => a + b) / latitudes.length;
-          const avgLng = longitudes.reduce((a, b) => a + b) / longitudes.length;
-          const distance = calculateDistance(userLat, userLng, avgLat, avgLng);
-
-          slots.push({
-            id: docSnap.id,
-            name: data.name,
-            total: data.total,
-            available: availableCount,
-            reservations: activeReservations || [],
-            lat: avgLat,
-            lng: avgLng,
-            distance,
-            corners: corners.map(c => [c.lat, c.lng])
-          });
-
-          L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
-        }
-      });
 
       slots.sort((a, b) => a.distance - b.distance);
 
@@ -217,7 +280,7 @@ const availableCount = data.total - reservedCount;
 
 
   const reserveBtn = document.createElement("button");
-reserveBtn.textContent = "Reserve Slot";
+  reserveBtn.textContent = "Reserve Slot";
 
 reserveBtn.onclick = async () => {
   if (!currentUser) {
@@ -295,13 +358,7 @@ if (expiredCount > 0) {
     reservations: active
   });
 }
-
-
   };
-
-
-
-
           const directionBtn = document.createElement("button");
           directionBtn.textContent = "Show Direction";
           directionBtn.onclick = () => {
@@ -396,7 +453,7 @@ const redMarker = L.rectangle(bounds, {
     alert("Error logging out: " + error.message);
   });
 }
-
   </script>
 </body>
 </html>
+          
