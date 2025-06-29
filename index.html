@@ -237,28 +237,6 @@
 
           console.log("Tracking location:", currentLat, currentLng, "Accuracy:", pos.coords.accuracy);
 
-          let insideAnyPolygon = false;
-
-          slots.forEach(slot => {
-            const inside = isPointInPolygon([currentLat, currentLng], slot.corners);
-            if (inside) {
-              insideAnyPolygon = true;
-              let insideAnyPolygon = false;
-
-querySnapshot.forEach((docSnap) => {
-  const data = docSnap.data();
-  const corners = [
-    data.corners.corner1,
-    data.corners.corner2,
-    data.corners.corner3,
-    data.corners.corner4
-  ];
-
-  const polygonCoords = corners.map(c => [c.lat, c.lng]);
-  if (isPointInPolygon([userLat, userLng], polygonCoords)) {
-    insideAnyPolygon = true;
-  }
-});
 
 if (insideAnyPolygon && !popupShown && !isParked) {
   popupShown = true;
