@@ -1,10 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nearby Parking Finder</title>
+
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+  <script>
+    window.showLogin = function () {
+      document.getElementById("login-form").style.display = "block";
+      document.getElementById("signup-form").style.display = "none";
+    };
+
+    window.showSignUp = function () {
+      document.getElementById("login-form").style.display = "none";
+      document.getElementById("signup-form").style.display = "block";
+    };
+
+    window.logIn = function () {
+      const email = document.getElementById("login-email").value;
+      const password = document.getElementById("login-password").value;
+      firebase.auth().signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          alert("Logged in!");
+          window.location.reload();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert("Login failed: " + error.message);
+        });
+    };
+
+    window.signUp = function () {
+      const email = document.getElementById("signup-email").value;
+      const password = document.getElementById("signup-password").value;
+      const confirm = document.getElementById("signup-confirm").value;
+      if (password !== confirm) {
+        alert("Passwords do not match");
+        return;
+      }
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          alert("Signed up successfully!");
+          window.location.reload();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert("Sign up failed: " + error.message);
+        });
+    };
+
+    window.googleLogin = function () {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+          alert("Logged in with Google!");
+          window.location.reload();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert("Google login failed: " + error.message);
+        });
+    };
+  </script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -43,75 +110,52 @@
 </head>
 <body>
 
-  
-  <div class="auth-container">
-    
-    <!-- Toggle Buttons -->
-    <div class="toggle-buttons">
+  <!-- Auth Buttons and Forms -->
+  <div id="auth-container">
+    <div style="margin-bottom: 10px;">
+      <button onclick="showLogin()">Log In</button>
       <button onclick="showSignUp()">Sign Up</button>
-      <button onclick="showLogIn()">Log In</button>
     </div>
 
-    <!-- Sign Up Form -->
-    <div id="signup-form" class="auth-form">
-      <h2>Sign Up</h2>
-      <input id="signup-username" placeholder="Username" />
-      <input id="signup-email" type="email" placeholder="Email" />
-      <input id="signup-password" type="password" placeholder="Password" />
-      <input id="signup-confirm" type="password" placeholder="Confirm Password" />
-      <button onclick="signUp()">Sign Up</button>
+    <div id="login-form">
+      <h3>Login</h3>
+      <input type="email" id="login-email" placeholder="Email"><br>
+      <input type="password" id="login-password" placeholder="Password"><br>
+      <button onclick="logIn()">Log In</button><br><br>
+      <button onclick="googleLogin()">Log In with Google</button>
     </div>
 
-    <!-- Log In Form -->
-    <div id="login-form" class="auth-form" style="display: none;">
-      <h2>Log In</h2>
-      <input id="login-email" type="email" placeholder="Email" />
-      <input id="login-password" type="password" placeholder="Password" />
-      <button onclick="logIn()">Log In</button>
-      <button class="google-btn" onclick="googleLogin()">Continue with Google</button>
+    <div id="signup-form" style="display: none;">
+      <h3>Sign Up</h3>
+      <input type="text" id="signup-username" placeholder="Username"><br>
+      <input type="email" id="signup-email" placeholder="Email"><br>
+      <input type="password" id="signup-password" placeholder="Password"><br>
+      <input type="password" id="signup-confirm" placeholder="Confirm Password"><br>
+      <button onclick="signUp()">Submit</button>
     </div>
-
   </div>
-
-  <!-- View Switcher Script -->
-  <script>
-    function showSignUp() {
-      document.getElementById("signup-form").style.display = "flex";
-      document.getElementById("login-form").style.display = "none";
-    }
-
-    function showLogIn() {
-      document.getElementById("signup-form").style.display = "none";
-      document.getElementById("login-form").style.display = "flex";
-    }
-  </script>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-  <!-- Your Firebase logic -->
-  <script src="app.js"></script>
-
-
-
-
-
 
   <button onclick="logout()">Logout</button>
 
-  
   <h1>🚗 Nearby Parking Slots</h1>
   <div id="map"></div>
   <div id="parkingList">Loading nearby slots...</div>
+
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-  
+
+  <!-- Your App Logic -->
   <script type="module">
+    import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import {getAuth, onAuthStateChanged, signOut} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
     const firebaseConfig = {
@@ -123,10 +167,19 @@
       appId: "1:967258176610:web:4604371f7a5fac6b28653b",
       measurementId: "G-X4EHNHRF25"
     };
+    
+    let parkedSlot = null;
 
-    const app = initializeApp(firebaseConfig);
+    firebase.initializeApp(firebaseConfig)
+
+
+   const app = initializeApp(firebaseConfig); // ✅ Correct modular version
+
+
+  
     const db = getFirestore(app);
     const auth = getAuth(app);
+
     let currentUser = null;
 
     window.logout = function() {
@@ -138,10 +191,16 @@
     });
   };
 
+
   onAuthStateChanged(auth, async (user) => {
     if (user) {
     currentUser = user;
     console.log("✅ Logged in as:", user.email);
+    }
+    else
+    {
+      console.log("Login failed");
+
     }
 
     
@@ -190,7 +249,7 @@
       const querySnapshot = await getDocs(parkingRef);
 
       const slots = [];
-      querySnapshot.forEach(async (docSnap) => {
+      for(const docSnap of querySnapshot.docs){
   const data = docSnap.data();
 
   // Step 1: Get current time
@@ -208,8 +267,7 @@
   // ✅ Now use it
   if (data.available !== availableCount) {
     await updateDoc(doc(db, "parking_lots", docSnap.id), {
-      available: availableCount,
-      reservations: activeReservations
+      available: availableCount
     });
   }
 
@@ -235,6 +293,7 @@
       total: data.total,
       available: availableCount,
       reservations: activeReservations || [],
+      reserved: reservedCount,
       lat: avgLat,
       lng: avgLng,
       distance,
@@ -243,7 +302,7 @@
 
     L.polygon(corners.map(c => [c.lat, c.lng]), { color: 'blue' }).addTo(map).bindPopup(`${data.name}`);
   }
-});
+}
 
 
       slots.sort((a, b) => a.distance - b.distance);
@@ -258,22 +317,22 @@
           const reservedCount = slot.reservations.length;
           const div = document.createElement("div");
           div.className = "slot";
-          div.innerHTML = `<strong>${slot.name}</strong><br>
-            Total Slots: ${slot.total}<br>
-            Available: ${slot.available}<br>
-            Reserved: ${reservedCount}<br>
-            Distance: ${slot.distance.toFixed(2)} km<br>`;
+          div.innerHTML = `
+  <strong>${slot.name}</strong><br>
+  Total Slots: ${slot.total}<br>
+  Available: ${slot.available}<br>
+  Reserved: ${reservedCount}<br>
+  Distance: ${slot.distance.toFixed(2)} km<br>
+`;
+
 
           const startTimeInput = document.createElement("input");
           startTimeInput.type = "time";
-          const startPeriod = document.createElement("select");
-          startPeriod.innerHTML = `<option value="AM">AM</option><option value="PM">PM</option>`;
+         
 
           const endTimeInput = document.createElement("input");
           endTimeInput.type = "time";
-          const endPeriod = document.createElement("select");
-          endPeriod.innerHTML = `<option value="AM">AM</option><option value="PM">PM</option>`;
-
+          
           const daysInput = document.createElement("input");
           daysInput.type = "number";
           daysInput.placeholder = "For how many days?";
@@ -282,83 +341,94 @@
   const reserveBtn = document.createElement("button");
   reserveBtn.textContent = "Reserve Slot";
 
-reserveBtn.onclick = async () => {
+  reserveBtn.onclick = async () => {
   if (!currentUser) {
     alert("You must be signed in.");
     return;
   }
 
-  if (!startTimeInput.value || !startPeriod.value || !endTimeInput.value || !endPeriod.value || !daysInput.value) {
+  if (!startTimeInput.value || !endTimeInput.value || !daysInput.value) {
     alert("Please fill in all reservation details.");
     return;
   }
 
   if (slot.available > 0) {
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const days = parseInt(daysInput.value);
 
-    // Today's date in YYYY-MM-DD
-const today = new Date();
-const todayStr = today.toISOString().split("T")[0];
+    const startTime24 = startTimeInput.value;
+    const endTime24 = endTimeInput.value;
 
-// Convert 12-hour input + AM/PM to 24-hour time
-function convertTo24Hour(timeStr, period) {
-  let [hours, minutes] = timeStr.split(":").map(Number);
-  if (period === "PM" && hours < 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  return `${hours.toString().padStart(2, "0")}:${minutes}`;
-}
+    const startTimestamp = new Date(`${todayStr}T${startTime24}:00`);
+    const endTimestamp = new Date(today);
+    endTimestamp.setDate(endTimestamp.getDate() + days - 1);
+    const [hours, minutes] = endTime24.split(":");
+    endTimestamp.setHours(parseInt(hours), parseInt(minutes), 0);
 
-const startTime24 = convertTo24Hour(startTimeInput.value, startPeriod.value);
-const endTime24 = convertTo24Hour(endTimeInput.value, endPeriod.value);
-
-const startTimestamp = new Date(`${todayStr}T${startTime24}:00`);
-const endTimestamp = new Date(`${todayStr}T${endTime24}:00`);
-
-
-
+    if (isNaN(startTimestamp.getTime()) || isNaN(endTimestamp.getTime())) {
+      alert("Invalid time input. Please check.");
+      return;
+    }
 
     const reservationData = {
-      userId: currentUser.uid,
-      email: currentUser.email,
-      lotId: slot.id,
-      lotName: slot.name,
-      startTimestamp: startTimestamp.toISOString(),
-      endTimestamp: endTimestamp.toISOString(),
-      days: parseInt(daysInput.value),
-      bookedAt: new Date().toISOString()
-    };
+  userId: currentUser.uid,
+  email: currentUser.email,
+  lotId: slot.id,
+  lotName: slot.name,
+  startTimestamp: startTimestamp.toISOString(),
+  endTimestamp: endTimestamp.toISOString(),
+  days,
+  bookedAt: new Date().toISOString()
+};
 
-    // ✅ Save to slot doc
-    await updateDoc(doc(db, "parking_lots", slot.id), {
-      available: slot.available - 1,
-      reservations: arrayUnion(reservationData)
-    });
+// 🔄 Update Firestore
+await updateDoc(doc(db, "parking_lots", slot.id), {
+  reservations: arrayUnion(reservationData)
+});
+await addDoc(collection(db, "reservations"), reservationData);
 
-    // ✅ Also save to central "reservations" collection
-    await addDoc(collection(db, "reservations"), reservationData);
+alert("Reservation confirmed!");
 
-    alert("Reservation confirmed!");
-    location.reload();
+
+// Filter only active ones
+const updatedSnap = await getDoc(doc(db, "parking_lots", slot.id));
+const updatedData = updatedSnap.data();
+
+const now = new Date();
+
+// ✅ Filter only active reservations from Firestore
+const activeReservations = (updatedData.reservations || []).filter(r => {
+  return new Date(r.endTimestamp) > now;
+});
+
+// 🔄 Update slot values
+slot.reservations = activeReservations;
+slot.available = slot.total - activeReservations.length;
+
+// ✅ Update UI
+div.innerHTML = `
+  <strong>${slot.name}</strong><br>
+  Total Slots: ${slot.total}<br>
+  Available: ${slot.available}<br>
+  Reserved: ${slot.reservations.length}<br>
+  Distance: ${slot.distance.toFixed(2)} km<br>
+`;
+
+div.appendChild(startTimeInput);
+div.appendChild(endTimeInput);
+div.appendChild(daysInput);
+div.appendChild(reserveBtn);
+div.appendChild(directionBtn);
+
   } else {
     alert("No slots available!");
   }
+};
 
-  const now = new Date();
 
-const expired = slot.reservations.filter(r => new Date(r.endTimestamp) < now);
-const active = slot.reservations.filter(r => new Date(r.endTimestamp) >= now);
 
-// Fix the count
-const expiredCount = expired.length;
-const newAvailable = slot.available + expiredCount;
 
-// Update Firestore
-if (expiredCount > 0) {
-  await updateDoc(doc(db, "parking_lots", slot.id), {
-    available: newAvailable,
-    reservations: active
-  });
-}
-  };
           const directionBtn = document.createElement("button");
           directionBtn.textContent = "Show Direction";
           directionBtn.onclick = () => {
@@ -372,9 +442,9 @@ if (expiredCount > 0) {
           };
 
           div.appendChild(startTimeInput);
-          div.appendChild(startPeriod);
+          
           div.appendChild(endTimeInput);
-          div.appendChild(endPeriod);
+        
           div.appendChild(daysInput);
           div.appendChild(reserveBtn);
           div.appendChild(directionBtn);
@@ -406,32 +476,83 @@ if (expiredCount > 0) {
                 popupShown = true;
                 const response = prompt("Are you going to park here? (Enter 'yes' after parking your vehicle)");
                 if (response && response.toLowerCase() === "yes") {
-                  isParked = true;
-                  const bounds = [
-  [currentLat - 0.0001, currentLng - 0.0001],
-  [currentLat + 0.0001, currentLng + 0.0001]
-];
+(async () => {
+  isParked = true;
+  parkedSlot = slot;
 
-const redMarker = L.rectangle(bounds, {
-  color: 'red',
-  weight: 2,
-  fillColor: 'red',
-  fillOpacity: 0.9
-}).addTo(map).bindPopup("Your parked location").openPopup();
+  const bounds = [
+    [currentLat - 0.0001, currentLng - 0.0001],
+    [currentLat + 0.0001, currentLng + 0.0001]
+  ];
 
-                }
-              }
-            }
+  redMarker = L.rectangle(bounds, {
+    color: 'red',
+    weight: 2,
+    fillColor: 'red',
+    fillOpacity: 0.9
+  }).addTo(map).bindPopup("Your parked location").openPopup();
+
+  try {
+    const slotRef = doc(db, "parking_lots", slot.id);
+    const docSnap = await getDoc(slotRef);
+    const data = docSnap.data();
+
+    const now = new Date();
+    const alreadyReserved = (data.reservations || []).some(r =>
+      r.userId === currentUser?.uid && new Date(r.endTimestamp) > now
+    );
+
+    if (!alreadyReserved) {
+      alert("❌ You don’t have an active reservation for this slot. Please reserve first.");
+      return;
+    }
+
+    const newAvailable = Math.max(data.available - 1, 0);
+    await updateDoc(slotRef, {
+      available: newAvailable
+    });
+    console.log("✅ Slot availability decreased");
+  } catch (err) {
+    console.error("❌ Error updating availability:", err);
+  }
+})();
+
+}
+
+              
+            }}
           });
 
-          if (!insideAnyPolygon && isParked) {
-            isParked = false;
-            popupShown = false;
-            if (redMarker) {
-              map.removeLayer(redMarker);
-              redMarker = null;
-            }
-          }
+          if (!insideAnyPolygon && isParked && parkedSlot) {
+  isParked = false;
+  popupShown = false;
+
+  (async () => {
+    try {
+      const slotRef = doc(db, "parking_lots", parkedSlot.id);
+      const docSnap = await getDoc(slotRef);
+      const data = docSnap.data();
+
+      const updatedAvailable = Math.min(data.total, data.available + 1);
+      await updateDoc(slotRef, {
+        available: updatedAvailable
+      });
+
+      console.log("✅ Seat marked as available again (user left area)");
+    } catch (error) {
+      console.error("Failed to update availability:", error);
+    }
+  })();
+
+  parkedSlot = null;
+
+  if (redMarker) {
+    map.removeLayer(redMarker);
+    redMarker = null;
+  }
+}
+
+
         }, (err) => {
           console.error("Error tracking position:", err);
         }, {
@@ -444,16 +565,5 @@ const redMarker = L.rectangle(bounds, {
       document.getElementById("parkingList").innerText = "Unable to access your location.";
     });
   </script>
-  <script>
-    function logout() {
-  signOut(auth).then(() => {
-    alert("Logged out");
-    window.location.reload();
-  }).catch((error) => {
-    alert("Error logging out: " + error.message);
-  });
-}
-  </script>
 </body>
 </html>
-          
